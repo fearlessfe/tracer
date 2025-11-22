@@ -82,3 +82,25 @@ export interface Project {
 }
 
 export type ProjectFormData = Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'dataSources' | 'documents'>;
+
+export interface Citation {
+  id: string;
+  docId: string;
+  title: string;
+  snippet: string;
+  sourceName?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'ai';
+  content: string;
+  createdAt: number;
+  citations?: Citation[];
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  lastMessageAt: number;
+}
