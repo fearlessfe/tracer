@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useNavigate, Outlet } from 'react-router-dom';
-import { Project, ProjectFormData, ProjectType } from './types';
+import { Project, ProjectFormData, ProjectType, User } from './types';
 import { ProjectCard } from './components/ProjectCard';
 import { Modal } from './components/Modal';
 import { ProjectForm } from './components/ProjectForm';
 import { Button } from './components/Button';
-import { LayoutGrid, Plus, Search, Archive } from 'lucide-react';
+import { Plus, Search, Archive, LogOut, User as UserIcon, ChevronDown } from 'lucide-react';
 import { ProjectDetail } from './components/ProjectDetail';
+import { Login } from './components/Login';
+import { Logo } from './components/Logo';
 
 // Dummy data for initial load if storage is empty
 const MOCK_PROJECTS: Project[] = [
@@ -34,23 +36,75 @@ const MOCK_PROJECTS: Project[] = [
   },
 ];
 
+// User Dropdown Component
+const UserMenu: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogout }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 p-1 pr-2 rounded-full hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200"
+      >
+        <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium overflow-hidden ring-2 ring-white">
+          {user.avatar ? <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" /> : user.name.charAt(0).toUpperCase()}
+        </div>
+        <span className="text-sm font-medium text-slate-700 hidden sm:block">{user.name}</span>
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50 animate-in fade-in zoom-in-95 duration-100">
+          <div className="px-4 py-3 border-b border-slate-100">
+            <p className="text-xs text-slate-500">登录账号</p>
+            <p className="text-sm font-medium text-slate-900 truncate">{user.username}</p>
+          </div>
+          <a href="#" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center">
+            <UserIcon className="mr-2 h-4 w-4 text-slate-400" /> 个人资料
+          </a>
+          <button
+            onClick={onLogout}
+            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+          >
+            <LogOut className="mr-2 h-4 w-4" /> 退出登录
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Layout Component
-const Layout: React.FC = () => {
+interface LayoutProps {
+  user: User;
+  onLogout: () => void;
+}
+
+const Layout: React.FC<LayoutProps> = ({ user, onLogout }) => {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-30 w-full border-b border-slate-200 bg-white/80 backdrop-blur transition-all">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600 text-white shadow-sm">
-              <LayoutGrid className="h-5 w-5" />
+          <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity group">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 text-primary-600 shadow-sm ring-1 ring-primary-100 group-hover:bg-primary-100 transition-colors">
+              <Logo className="h-6 w-6" />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">BlueSpace</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 font-sans">Tracer</h1>
           </Link>
           
           <div className="flex items-center gap-4">
-            <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-medium">
-              U
-            </div>
+            <UserMenu user={user} onLogout={onLogout} />
           </div>
         </div>
       </header>
@@ -161,13 +215,19 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, onCreateClick, onEdit, 
 
 // Main App Component
 const App: React.FC = () => {
+  const [user, setUser] = useState<User | null>(() => {
+    // Changed key to tracer_user for rebranding
+    const savedUser = localStorage.getItem('tracer_user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [projects, setProjects] = useState<Project[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
 
   // Initialize data
   useEffect(() => {
-    const saved = localStorage.getItem('bluespace_projects');
+    // Changed key to tracer_projects for rebranding
+    const saved = localStorage.getItem('tracer_projects');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -182,14 +242,40 @@ const App: React.FC = () => {
         setProjects(MOCK_PROJECTS);
       }
     } else {
-      setProjects(MOCK_PROJECTS);
+      // Fallback: Try to load old BlueSpace data to migrate
+      const oldData = localStorage.getItem('bluespace_projects');
+      if (oldData) {
+        try {
+           const parsed = JSON.parse(oldData);
+           const migrated = parsed.map((p: Project) => ({
+            ...p,
+            dataSources: p.dataSources || [],
+            documents: p.documents || []
+          }));
+          setProjects(migrated);
+        } catch(e) {
+          setProjects(MOCK_PROJECTS);
+        }
+      } else {
+        setProjects(MOCK_PROJECTS);
+      }
     }
   }, []);
 
   // Persistence
   useEffect(() => {
-    localStorage.setItem('bluespace_projects', JSON.stringify(projects));
+    localStorage.setItem('tracer_projects', JSON.stringify(projects));
   }, [projects]);
+
+  const handleLogin = (user: User) => {
+    setUser(user);
+    localStorage.setItem('tracer_user', JSON.stringify(user));
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('tracer_user');
+  };
 
   const handleCreate = (data: ProjectFormData) => {
     const newProject: Project = {
@@ -245,10 +331,14 @@ const App: React.FC = () => {
     setEditingProject(null);
   };
 
+  if (!user) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Layout />}>
+        <Route path="/" element={<Layout user={user} onLogout={handleLogout} />}>
           <Route index element={
             <Dashboard 
               projects={projects} 

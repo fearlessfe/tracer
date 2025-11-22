@@ -1,5 +1,5 @@
 {
-  "name": "BlueSpace Project Manager",
-  "description": "A modern, blue-themed project management dashboard allowing users to manage projects, knowledge bases, and team members with AI-assisted description generation.",
+  "name": "Tracer",
+  "description": "Tracer 是一个智能追溯平台，帮助团队构建需求、代码与测试之间的全链路追溯关系，并提供 AI 辅助问答与文档生成。",
   "requestFramePermissions": []
 }

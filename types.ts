@@ -10,6 +10,13 @@ export interface Member {
   role?: string;
 }
 
+export interface User {
+  id: string;
+  username: string;
+  name: string;
+  avatar?: string;
+}
+
 export type DataSourceType = 'file' | 'git' | 'jira';
 
 export interface DataSource {
