@@ -1,10 +1,10 @@
-
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Project, ProjectType, DataSource, DataSourceType, Document, NormalizedItem, NormalizationStatus, ParsingStatus, ParsedContentItem, ParsedTable, ParsedImage, ChatMessage, Citation, ChatSession } from '../types';
 import { Database, FileText, ArrowLeft, Folder, Book, Github, UploadCloud, Trello, Plus, CheckCircle, File, Trash2, RefreshCw, Upload, Key, Globe, Link as LinkIcon, CheckSquare, Search, FileCode, ChevronRight, ChevronDown, X, LayoutList, User, Lock, Settings, Sparkles, ScanSearch, Split, Columns, Loader2, FileJson, Table as TableIcon, ImageIcon, AlignLeft, Eye, BrainCircuit, GitGraph, Network, Share2, ArrowDown, ArrowRight, Layers, FileSearch, ListTree, Link2, Grid3X3, LayoutDashboard, Clock, Save, MoreHorizontal, PlayCircle, Filter, Lightbulb, MessageSquare, Send, Bot, User as UserIcon, Quote, PanelLeftClose, PanelLeftOpen, History, GitMerge, Library, GraduationCap } from 'lucide-react';
 import { Button } from './Button';
 import { Modal } from './Modal';
+import { TraceabilityGraph } from './TraceabilityGraph';
 
 interface ProjectDetailProps {
   projects: Project[];
@@ -157,6 +157,7 @@ interface TraceNode {
   type: 'req' | 'tc' | 'arch' | 'dd';
   x: number;
   y: number;
+  description?: string;
 }
 
 interface TraceEdge {
@@ -184,7 +185,8 @@ const generateMockNodesForDoc = (doc: Document, type: TraceNode['type']): TraceN
       id: `${doc.id}-item-${i}`,
       label: `${type.toUpperCase()}-${i}`, // Simple label
       type,
-      x: 0, y: 0 // Layout handled dynamically
+      x: 0, y: 0, // Layout handled dynamically
+      description: `这是关于 ${doc.title} 条目 ${i} 的详细描述信息。它包含具体的规范定义、验收标准或技术实现细节。`
     });
   }
   return nodes;
@@ -206,12 +208,20 @@ const generateDashboardData = () => {
   
   const createNodes = (count: number, prefix: string, type: TraceNode['type'], xPosPct: number) => {
      for (let i = 1; i <= count; i++) {
+       const label = `${prefix}-${i}`;
+       let desc = '';
+       if (type === 'req') desc = `用户必须能够通过 ${label} 接口完成数据验证，且响应时间不超过 200ms。优先级：High。`;
+       if (type === 'tc') desc = `验证 ${label.replace('TC', 'REQ')} 的功能正确性，包含正常流与异常流测试。前置条件：用户已登录。`;
+       if (type === 'arch') desc = `系统核心模块 ${label} 的架构定义，负责处理高并发请求。采用微服务架构设计。`;
+       if (type === 'dd') desc = `针对 ${label} 的详细类图与序列图设计规范。包含具体的接口定义和数据结构。`;
+       
        nodes.push({
-         id: `${prefix}-${i}`,
-         label: `${prefix}-${i}`,
+         id: label,
+         label: label,
          type,
          x: width * xPosPct,
-         y: (height / (count + 1)) * i
+         y: (height / (count + 1)) * i,
+         description: desc
        });
      }
   };
@@ -378,7 +388,7 @@ const BuildRelationModal: React.FC<BuildRelationModalProps> = ({ isOpen, onClose
     if (typeStr.includes('需求') || typeStr.includes('req') || typeStr.includes('spec') || typeStr === 'epic' || typeStr === 'story') return 'req';
     if (typeStr.includes('架构') || typeStr.includes('arch') || title.includes('system')) return 'arch';
     if (typeStr.includes('设计') || typeStr.includes('design') || title.includes('detail')) return 'design';
-    if (typeStr.includes('测试') || typeStr.includes('test') || typeStr.includes('case')) return 'test';
+    if (typeStr.includes('test') || typeStr.includes('test') || typeStr.includes('case')) return 'test';
     if (typeStr.includes('缺陷') || typeStr.includes('bug')) return 'bug';
     if (typeStr.includes('任务') || typeStr.includes('task')) return 'task';
     if (typeStr === 'git-repo') return 'repo';
@@ -599,13 +609,23 @@ const TraceabilityView: React.FC<TraceabilityViewProps> = ({
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [graphMode, setGraphMode] = useState<'network' | 'tree'>('network');
   
   // View State for Traceability Tab
   const [activeRecordId, setActiveRecordId] = useState<string | null>(null);
   const [matrixTab, setMatrixTab] = useState<string>('default');
   const [editedEdges, setEditedEdges] = useState<TraceEdge[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // View State for Dashboard
+  const [graphFilters, setGraphFilters] = useState<string[]>(['req', 'tc', 'arch', 'dd']);
+  const [graphSearch, setGraphSearch] = useState('');
+
+  const handleFilterToggle = (type: string) => {
+     setGraphFilters(prev => 
+        prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+     );
+  };
 
   // Calculate existing relations for modal to disable
   const existingRelations = useMemo(() => {
@@ -619,30 +639,6 @@ const TraceabilityView: React.FC<TraceabilityViewProps> = ({
      });
      return rels;
   }, [records]);
-
-  // Helper for dashboard highlights
-  const getConnected = (nodeId: string | null) => {
-    if (!nodeId || !dashboardGraph) return { nodes: new Set(), edges: new Set() };
-    const connectedNodes = new Set<string>([nodeId]);
-    const connectedEdges = new Set<string>();
-    let changed = true;
-    while (changed) {
-      changed = false;
-      dashboardGraph.edges.forEach((edge) => {
-         const edgeId = `${edge.source}-${edge.target}`;
-         if (connectedEdges.has(edgeId)) return;
-         if (connectedNodes.has(edge.source) || connectedNodes.has(edge.target)) {
-            connectedNodes.add(edge.source);
-            connectedNodes.add(edge.target);
-            connectedEdges.add(edgeId);
-            changed = true;
-         }
-      });
-    }
-    return { nodes: connectedNodes, edges: connectedEdges };
-  };
-
-  const dashboardHighlights = useMemo(() => getConnected(hoveredNode || selectedNode), [hoveredNode, selectedNode, dashboardGraph]);
 
   const getNodeColor = (type: TraceNode['type']) => {
     switch(type) {
@@ -704,87 +700,85 @@ const TraceabilityView: React.FC<TraceabilityViewProps> = ({
     
     return (
       <div className="flex flex-col h-full relative">
-        {/* Search Bar Header for Dashboard */}
-        <div className="h-16 border-b border-slate-200 flex items-center justify-between px-6 bg-white shrink-0 z-20 shadow-sm">
-           <div className="flex items-center gap-4">
-               <h2 className="font-bold text-slate-800 flex items-center gap-2 text-lg">
-                 <LayoutDashboard className="w-5 h-5 text-primary-600" />
-                 项目全景仪表盘
-               </h2>
-               <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded-full bg-slate-50">Entry Level Full Data</span>
-           </div>
+        {/* New Header with Search and Controls */}
+        <div className="h-14 border-b border-slate-200 flex items-center justify-between px-6 bg-white shrink-0 z-20 gap-4">
+           <h2 className="font-bold text-slate-800 text-lg flex items-center gap-2 shrink-0">
+              <LayoutDashboard className="w-5 h-5 text-primary-600" />
+              全景追溯
+           </h2>
            
-           {/* Search Box that jumps to Chat */}
-           <div className="flex-1 max-w-xl mx-6 relative">
-             <div className="relative">
-                <input
-                  type="text"
-                  placeholder="向 AI 助手提问 (例如: 系统有哪些高优先级需求?)"
-                  className="w-full pl-10 pr-4 py-2 rounded-full border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all shadow-sm text-sm"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && onSearchQuery && searchQuery.trim()) {
-                      onSearchQuery(searchQuery);
-                      setSearchQuery('');
-                    }
-                  }}
-                />
-                <Sparkles className="w-4 h-4 text-primary-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-             </div>
+           {/* Search Input */}
+           <div className="flex-1 max-w-md relative">
+              <input
+                 type="text"
+                 value={graphSearch}
+                 onChange={(e) => setGraphSearch(e.target.value)}
+                 placeholder="搜索节点 (例如: REQ-1, TC-5)..."
+                 className="w-full pl-9 pr-4 py-1.5 rounded-md border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+              />
+              <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
            </div>
 
-           <div className="flex items-center">
-              {/* Right side actions if needed */}
+           <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
+              <button 
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${graphMode === 'network' ? 'bg-white text-primary-700 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+                onClick={() => setGraphMode('network')}
+              >
+                <Network className="w-3 h-3 inline mr-1" />
+                网状图
+              </button>
+              <button 
+                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${graphMode === 'tree' ? 'bg-white text-primary-700 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+                 onClick={() => setGraphMode('tree')}
+              >
+                <ListTree className="w-3 h-3 inline mr-1" />
+                树状图
+              </button>
            </div>
         </div>
 
-        <div className="flex-1 overflow-hidden relative">
-             <div className="absolute left-0 top-0 bottom-0 w-64 bg-slate-50 border-r border-slate-200 flex flex-col p-4 overflow-y-auto z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-               {/* Legend Content (Same as before) */}
-               <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center">
-                  <Layers className="w-4 h-4 mr-2 text-primary-500" />
-                  条目类型图例
+        <div className="flex-1 overflow-hidden relative flex">
+             {/* Shrinked Sidebar */}
+             <div className="w-48 bg-slate-50 border-r border-slate-200 flex flex-col p-4 overflow-y-auto z-10 shrink-0">
+               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center">
+                  <Layers className="w-3.5 h-3.5 mr-2" />
+                  显示过滤
                </h3>
-               <div className="space-y-4">
+               <div className="space-y-3">
                  {['req', 'tc', 'arch', 'dd'].map(t => (
-                   <div key={t} className="flex items-center">
-                      <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: getNodeColor(t as any) }}></div>
-                      <span className="text-xs font-medium text-slate-700 uppercase">{t}</span>
-                   </div>
+                   <label key={t} className="flex items-center cursor-pointer hover:bg-slate-100 p-1 -ml-1 rounded">
+                      <input 
+                         type="checkbox" 
+                         className="sr-only peer"
+                         checked={graphFilters.includes(t)}
+                         onChange={() => handleFilterToggle(t)}
+                      />
+                      {/* Custom Checkbox Style */}
+                      <div className={`w-4 h-4 rounded border mr-2 flex items-center justify-center transition-colors ${
+                         graphFilters.includes(t) ? 'bg-white border-slate-300' : 'bg-slate-100 border-slate-200 opacity-50'
+                      }`}>
+                         {graphFilters.includes(t) && <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: getNodeColor(t as any) }} />}
+                      </div>
+                      <span className={`text-xs font-medium uppercase ${graphFilters.includes(t) ? 'text-slate-700' : 'text-slate-400 line-through'}`}>
+                         {t}
+                      </span>
+                   </label>
                  ))}
                </div>
-               <div className="mt-auto">
-                 <p className="text-[10px] text-slate-400">此视图展示当前项目所有文档解析后的条目关联概况。</p>
+               <div className="mt-auto pt-4 border-t border-slate-200">
+                 <p className="text-[10px] text-slate-400 leading-relaxed">
+                    点击上方复选框可过滤显示不同类型的追溯节点。
+                 </p>
                </div>
              </div>
-             <div className="flex-1 h-full overflow-auto bg-slate-50/50 pl-64">
-               <svg width={1200} height={1000} className="mx-auto my-8 bg-white shadow-sm rounded-xl">
-                  {dashboardGraph.edges.map((edge, idx) => {
-                    const s = dashboardGraph.nodes.find(n => n.id === edge.source);
-                    const t = dashboardGraph.nodes.find(n => n.id === edge.target);
-                    if (!s || !t) return null;
-                    const isHigh = dashboardHighlights.edges.has(`${edge.source}-${edge.target}`);
-                    const isDim = (hoveredNode || selectedNode) && !isHigh;
-                    return <line key={idx} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke={isHigh ? '#3b82f6' : '#cbd5e1'} strokeWidth={isHigh ? 2 : 1} strokeOpacity={isDim ? 0.1 : 0.4} />;
-                  })}
-                  {dashboardGraph.nodes.map(node => {
-                     const isHigh = dashboardHighlights.nodes.has(node.id);
-                     const isDim = (hoveredNode || selectedNode) && !isHigh;
-                     return (
-                       <circle 
-                         key={node.id} 
-                         cx={node.x} cy={node.y} r={isHigh ? 8 : 5} 
-                         fill={getNodeColor(node.type)} 
-                         opacity={isDim ? 0.2 : 1}
-                         onMouseEnter={() => setHoveredNode(node.id)}
-                         onMouseLeave={() => setHoveredNode(null)}
-                         onClick={() => setSelectedNode(node.id === selectedNode ? null : node.id)}
-                         className="cursor-pointer transition-all"
-                       />
-                     );
-                  })}
-               </svg>
+             
+             <div className="flex-1 h-full overflow-hidden bg-slate-50/30">
+               <TraceabilityGraph 
+                  data={dashboardGraph} 
+                  mode={graphMode} 
+                  activeTypes={graphFilters}
+                  searchQuery={graphSearch}
+               />
              </div>
         </div>
       </div>
@@ -901,9 +895,6 @@ const TraceabilityView: React.FC<TraceabilityViewProps> = ({
   };
 
   const renderMatrixDetail = () => {
-     // ... (Existing matrix detail render code logic, omitted for brevity but assumed present)
-     // For the update, I'm reusing the logic by reference or copy if I had to write the whole file.
-     // Since the prompt asks for updates, I will paste the existing implementation back to ensure file integrity.
      const record = records.find(r => r.id === activeRecordId);
     if (!record) return null;
 
