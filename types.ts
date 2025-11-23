@@ -31,6 +31,7 @@ export interface DataSource {
 
 export type NormalizationStatus = 'unprocessed' | 'processing' | 'completed';
 export type ParsingStatus = 'unprocessed' | 'processing' | 'completed';
+export type VerificationStatus = 'unverified' | 'verified';
 
 export type ParsedItemType = 'text' | 'table' | 'image';
 
@@ -54,6 +55,7 @@ export interface NormalizedItem {
   content: string; // The extracted rule/requirement/summary
   originalText: string; // The exact text in the source doc to highlight
   category?: string;
+  sourceIndices?: number[]; // indices of parsedContent that contributed to this item
 }
 
 export interface Document {
@@ -68,6 +70,7 @@ export interface Document {
   
   // Parsing Stage
   parsingStatus?: ParsingStatus;
+  parsingVerificationStatus?: VerificationStatus; // New: User confirmation status
   parsedContent?: ParsedContentItem[];
   semanticType?: string; // The inferred V-Model type (e.g. 'Requirements', 'System Design')
 

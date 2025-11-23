@@ -14,19 +14,149 @@ import { Logo } from './components/Logo';
 const MOCK_PROJECTS: Project[] = [
   {
     id: '1',
-    name: '网站重构计划',
-    description: '将旧版门户网站迁移至 Next.js 框架，提升性能与 SEO 表现。',
+    name: '智能座舱 HMI 系统研发',
+    description: '下一代电动汽车智能座舱人机交互系统，集成 AR-HUD 导航与 ADAS 告警可视化。',
     type: ProjectType.Project,
     members: [{ id: 'm1', name: '张三' }, { id: 'm2', name: '李四' }],
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    dataSources: [],
-    documents: []
+    dataSources: [
+      {
+        id: 'ds-mock-1',
+        name: '产品需求库',
+        type: 'file',
+        config: '2 个文件',
+        details: { fileNames: ['HMI_Navigation_Spec_v3.0.docx', 'ADAS_Alert_System_Arch.pdf'] },
+        status: 'synced',
+        lastSync: Date.now()
+      }
+    ],
+    documents: [
+      {
+        id: 'doc-mock-1',
+        title: '01_HMI_导航交互规范_v3.0.docx',
+        sourceId: 'ds-mock-1',
+        fileType: 'docx',
+        updatedAt: Date.now(),
+        path: 'HMI_Navigation_Spec_v3.0.docx',
+        enabled: true,
+        parsingStatus: 'completed',
+        parsingVerificationStatus: 'unverified', // 状态：待校验，展示解析视图
+        semanticType: '需求规格说明书',
+        // 模拟解析内容：包含图片、表格，供用户在解析视图中检查和修改描述
+        parsedContent: [
+          {
+            type: 'text',
+            content: '# HMI 导航系统需求规格说明书 v3.0\n\n## 1. 概述\n本模块定义了智能座舱仪表盘（IC）与抬头显示（HUD）的导航信息显示规范。系统应在车辆行驶过程中提供实时、准确的路径引导。\n\n## 2. 仪表盘导航卡片显示逻辑\n当驾驶员开启导航模式时，仪表盘中央区域应切换为导航卡片模式。'
+          },
+          {
+            type: 'image',
+            content: {
+               url: 'https://placehold.co/800x450/1e293b/94a3b8?text=Cluster+Navigation+UI',
+               caption: '【AI 自动生成描述】这是一张汽车全液晶仪表盘的 UI 原型图。\n1. 布局结构：屏幕分为左、中、右三栏。左侧显示车辆状态（胎压、车门），右侧显示多媒体信息。\n2. 核心区域（中央）：显示 3D 导航地图。当前车速“80 km/h”以大号字体悬浮显示在地图下方居中位置。\n3. 导航引导：地图上方有一个蓝色的转向箭头图标，指示“前方 500米 右转进入 世纪大道”。\n4. ADAS 状态：底部状态栏显示车道保持辅助（LKA）图标为绿色，表示功能已激活。'
+            }
+          },
+          {
+            type: 'text',
+            content: '## 3. 性能需求 (Non-functional Requirements)\n- **冷启动时间**：从点火信号（IGN_ON）发出到导航界面完全加载，时间不得超过 2.5 秒。\n- **帧率要求**：地图渲染帧率在任何工况下不得低于 60 FPS。'
+          },
+          {
+            type: 'table',
+            content: {
+                headers: ['告警等级', '触发条件', '显示策略', 'UI 示例 (AI 识别)'],
+                rows: [
+                    ['Level 1 (提示)', '剩余电量 < 20%', '状态栏电池图标闪烁黄色', '![黄色电池图标](https://placehold.co/100x40/fef08a/854d0e?text=Low+Battery)'],
+                    ['Level 2 (警告)', '车道偏离 (LDW)', '仪表盘显示红色车道线', '![红色车道线](https://placehold.co/100x60/fecaca/991b1b?text=LDW+Alert)'],
+                    ['Level 3 (紧急)', '前向碰撞预警 (FCW)', '全屏弹窗覆盖导航', '![前向碰撞图标](https://placehold.co/100x60/fee2e2/991b1b?text=FCW+Warning) 高频警报 + 座椅震动']
+                ]
+            }
+          }
+        ]
+      },
+      {
+        id: 'doc-mock-2',
+        title: '02_ADAS_告警系统架构说明书.pdf',
+        sourceId: 'ds-mock-1',
+        fileType: 'pdf',
+        updatedAt: Date.now(),
+        path: 'ADAS_Alert_System_Arch.pdf',
+        enabled: true,
+        parsingStatus: 'completed',
+        parsingVerificationStatus: 'verified', // 状态：已校验
+        normalizationStatus: 'completed',      // 状态：已规范化，展示分屏视图
+        semanticType: '架构设计文档',
+        // 左侧：规范化结果
+        normalizedItems: [
+            {
+                id: 'norm-1',
+                category: '系统架构',
+                content: 'ADAS 告警系统采用分层架构设计，分为感知层、决策层和执行层。感知层负责雷达与摄像头数据融合。',
+                originalText: '系统架构设计... 采用分层架构... 感知层...',
+                sourceIndices: [1, 2, 4] // 关联到右侧的标题(1), 正文(2), 图片(4)
+            },
+            {
+                id: 'norm-2',
+                category: '数据流转',
+                content: '传感器数据通过 CAN-FD 总线传输至域控制器，延迟需控制在 10ms 以内。',
+                originalText: '数据传输链路... CAN-FD 总线... 延迟 < 10ms',
+                sourceIndices: [3, 7] // 关联到右侧的正文(3) 和 表格(7)
+            }
+        ],
+        // 右侧：解析内容（细粒度拆分，标题和内容分开，方便单独选择）
+        parsedContent: [
+          {
+             type: 'text',
+             content: '# ADAS 告警系统架构设计'
+          },
+          {
+             type: 'text', // Index 1: Title
+             content: '## 1. 系统架构概述'
+          },
+          {
+             type: 'text', // Index 2: Content
+             content: 'ADAS 告警系统采用经典的分层架构设计模式，主要由三个核心层级组成：感知层（Perception）、决策层（Decision）和执行层（Action）。'
+          },
+          {
+             type: 'text', // Index 3: Content
+             content: '各层级之间通过车载以太网与 CAN-FD 总线进行高带宽、低延迟的数据交换。'
+          },
+          {
+             type: 'image', // Index 4: Image
+             content: {
+                url: 'https://placehold.co/600x400/e2e8f0/475569?text=Architecture+Diagram',
+                caption: '图 1-1：ADAS 系统逻辑架构图。图中展示了 Radar、Camera 输入流向 Domain Controller，处理后输出至 HMI 和 Brake System。'
+             }
+          },
+          {
+             type: 'text', // Index 5
+             content: '## 2. 感知层定义'
+          },
+          {
+             type: 'text', // Index 6
+             content: '感知层主要负责环境数据的采集与预处理。主要传感器包含：\n1. 前向毫米波雷达 (77GHz)\n2. 前视多功能摄像头 (MPC)'
+          },
+           {
+             type: 'text', // Index 7: Table for interfaces
+             content: '## 3. 接口规范'
+          },
+          {
+             type: 'table', // Index 8
+             content: {
+                 headers: ['接口ID', '源', '目标', '协议'],
+                 rows: [
+                     ['IF_001', 'Radar', 'Domain Ctrl', 'CAN-FD'],
+                     ['IF_002', 'Camera', 'Domain Ctrl', 'LVDS']
+                 ]
+             }
+          }
+        ]
+      }
+    ]
   },
   {
     id: '2',
-    name: '设计规范文档',
-    description: '统一公司内部 UI 组件库的设计语言与交互规范。',
+    name: '自动驾驶算法规范库',
+    description: 'L3 级自动驾驶感知、决策与控制算法接口定义文档。',
     type: ProjectType.KnowledgeBase,
     members: [{ id: 'm3', name: '王五' }],
     createdAt: Date.now() - 100000,
@@ -242,23 +372,8 @@ const App: React.FC = () => {
         setProjects(MOCK_PROJECTS);
       }
     } else {
-      // Fallback: Try to load old BlueSpace data to migrate
-      const oldData = localStorage.getItem('bluespace_projects');
-      if (oldData) {
-        try {
-           const parsed = JSON.parse(oldData);
-           const migrated = parsed.map((p: Project) => ({
-            ...p,
-            dataSources: p.dataSources || [],
-            documents: p.documents || []
-          }));
-          setProjects(migrated);
-        } catch(e) {
-          setProjects(MOCK_PROJECTS);
-        }
-      } else {
-        setProjects(MOCK_PROJECTS);
-      }
+       // Reset to MOCK_PROJECTS if nothing is found (or old BlueSpace data is ignored for clean slate)
+       setProjects(MOCK_PROJECTS);
     }
   }, []);
 
